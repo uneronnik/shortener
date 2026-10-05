@@ -1,0 +1,20 @@
+# Бинарники
+/bin/
+*.exe
+*.test
+*.out
+
+# Секреты
+.env
+.env.*
+
+# Личное для Claude
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Рабочие заметки (убери строку, если хочешь их публиковать)
+PROGRESS.md
+
+# IDE
+.idea/
+.vscode/
