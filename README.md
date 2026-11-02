@@ -59,6 +59,11 @@ curl http://localhost:8080/links/aB3xK9q
 - `cmd/shortener` — сборка и запуск, `cmd/migrate` — миграции
 
 ## Тесты
+
+Разработка ведётся по TDD: сначала падающий тест на ожидаемое поведение,
+затем минимальная реализация, после — рефакторинг с проходящими тестами.
+Домен и сервис тестируются без БД и HTTP, хендлеры — через `httptest`.
+
 ```bash
 go test ./...                                   # unit
 TEST_DATABASE_URL=postgres://... go test ./...  # + integration
