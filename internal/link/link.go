@@ -4,12 +4,20 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"time"
 )
 
-var ErrInvalidURL = errors.New("invalid URL")
+var (
+	ErrInvalidURL = errors.New("invalid URL")
+	ErrNotFound   = errors.New("link not found")
+	ErrCodeTaken  = errors.New("link code already taken")
+)
 
 type Link struct {
-	URL string
+	URL       string
+	Code      string
+	Clicks    int64
+	CreatedAt time.Time
 }
 
 func New(rawURL string) (Link, error) {
