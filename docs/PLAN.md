@@ -11,7 +11,7 @@
 - [x] **3. Сервис.** `Shorten`, `Resolve` (URL + инкремент счётчика), `Stats`; повтор до 3 раз при
   `ErrCodeTaken`; `ErrNotFound`.
   *Тест:* фейковый репозиторий в `_test.go`, фиксированный генератор для проверки повтора.
-- [ ] **4. HTTP-слой.** `POST /links`, `GET /{code}`, `GET /links/{code}`; JSON; ошибки → 400/404/500;
+- [x] **4. HTTP-слой.** `POST /links`, `GET /{code}`, `GET /links/{code}`; JSON; ошибки → 400/404/500;
   `BASE_URL` из env.
   *Тест:* `httptest` на каждый эндпоинт и код ответа.
 - [ ] **5. PostgreSQL в Docker.** `docker-compose.yml` с `db`; миграция таблицы `links`

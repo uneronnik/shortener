@@ -31,7 +31,7 @@ func main() {
 func run(ctx context.Context, addr string, logger *slog.Logger) error {
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           httpapi.NewHandler(),
+		Handler:           httpapi.NewHandler(nil, baseURL()),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	serverErr := make(chan error, 1)
@@ -56,4 +56,11 @@ func run(ctx context.Context, addr string, logger *slog.Logger) error {
 	}
 	logger.Info("HTTP server stopped")
 	return nil
+}
+
+func baseURL() string {
+	if value := os.Getenv("BASE_URL"); value != "" {
+		return value
+	}
+	return "http://localhost:8080"
 }

@@ -10,6 +10,21 @@ import (
 	"time"
 )
 
+func TestBaseURL(t *testing.T) {
+	for _, value := range []string{"", "https://sho.rt/prefix"} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv("BASE_URL", value)
+			want := value
+			if want == "" {
+				want = "http://localhost:8080"
+			}
+			if got := baseURL(); got != want {
+				t.Fatalf("baseURL = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
 func TestRunCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

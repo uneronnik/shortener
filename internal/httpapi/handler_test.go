@@ -21,7 +21,7 @@ func TestHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			response := httptest.NewRecorder()
-			NewHandler().ServeHTTP(response, httptest.NewRequest(tt.method, tt.path, nil))
+			NewHandler(nil, "").ServeHTTP(response, httptest.NewRequest(tt.method, tt.path, nil))
 			if response.Code != tt.status {
 				t.Fatalf("status = %d, want %d", response.Code, tt.status)
 			}
