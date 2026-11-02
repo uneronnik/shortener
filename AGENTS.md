@@ -7,7 +7,7 @@
 - Go (версия — из go.mod), стандартная библиотека в приоритете
 - HTTP: `net/http`, роутинг через `http.ServeMux` с шаблонами путей (`GET /{code}`)
 - БД: PostgreSQL + `pgx/v5` (`pgxpool`)
-- Миграции: <goose | migrate/migrate — решить на шаге 5>
+- Миграции: goose (библиотека в `cmd/migrate`, SQL встроен через `embed.FS`)
 - Логи: `log/slog`
 - Тесты: `testing` + table-driven тесты, `net/http/httptest`
 
