@@ -5,7 +5,7 @@
 - [x] **1. Скелет.** `cmd/shortener/main.go`: `GET /healthz`, порт из `PORT`, `slog`, graceful shutdown
   (`signal.NotifyContext` + `http.Server.Shutdown`).
   *Тест:* `httptest` — `/healthz` отвечает 200.
-- [ ] **2. Домен.** `link.New(url)` с валидацией (пусто, `ftp://`, относительный путь, нет хоста, ок);
+- [x] **2. Домен.** `link.New(url)` с валидацией (пусто, `ftp://`, относительный путь, нет хоста, ок);
   генератор кода — 7 символов base62 из `crypto/rand`.
   *Тест:* табличный тест валидации; длина и алфавит кода.
 - [ ] **3. Сервис.** `Shorten`, `Resolve` (URL + инкремент счётчика), `Stats`; повтор до 3 раз при
