@@ -2,16 +2,16 @@
 
 Каждый шаг — отдельная ветка (`task`) и отдельная сессия; после шага всё компилируется и тесты зелёные.
 
-- [ ] **1. Скелет.** `cmd/shortener/main.go`: `GET /healthz`, порт из `PORT`, `slog`, graceful shutdown
+- [x] **1. Скелет.** `cmd/shortener/main.go`: `GET /healthz`, порт из `PORT`, `slog`, graceful shutdown
   (`signal.NotifyContext` + `http.Server.Shutdown`).
   *Тест:* `httptest` — `/healthz` отвечает 200.
-- [ ] **2. Домен.** `link.New(url)` с валидацией (пусто, `ftp://`, относительный путь, нет хоста, ок);
+- [x] **2. Домен.** `link.New(url)` с валидацией (пусто, `ftp://`, относительный путь, нет хоста, ок);
   генератор кода — 7 символов base62 из `crypto/rand`.
   *Тест:* табличный тест валидации; длина и алфавит кода.
-- [ ] **3. Сервис.** `Shorten`, `Resolve` (URL + инкремент счётчика), `Stats`; повтор до 3 раз при
+- [x] **3. Сервис.** `Shorten`, `Resolve` (URL + инкремент счётчика), `Stats`; повтор до 3 раз при
   `ErrCodeTaken`; `ErrNotFound`.
   *Тест:* фейковый репозиторий в `_test.go`, фиксированный генератор для проверки повтора.
-- [ ] **4. HTTP-слой.** `POST /links`, `GET /{code}`, `GET /links/{code}`; JSON; ошибки → 400/404/500;
+- [x] **4. HTTP-слой.** `POST /links`, `GET /{code}`, `GET /links/{code}`; JSON; ошибки → 400/404/500;
   `BASE_URL` из env.
   *Тест:* `httptest` на каждый эндпоинт и код ответа.
 - [ ] **5. PostgreSQL в Docker.** `docker-compose.yml` с `db`; миграция таблицы `links`
