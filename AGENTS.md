@@ -1,7 +1,7 @@
 # Проект: shortener
 
 Сервис сокращения ссылок: создаёт короткий код для URL, перенаправляет по нему и считает переходы.
-Go, REST, PostgreSQL, Docker. Development plan: `docs/PLAN.md`.
+Стек: Go, REST, PostgreSQL, Docker. План разработки — в `docs/PLAN.md`.
 
 ## Стек
 - Go (версия — из go.mod), стандартная библиотека в приоритете
