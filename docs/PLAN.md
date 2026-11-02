@@ -2,7 +2,7 @@
 
 Каждый шаг — отдельная ветка (`task`) и отдельная сессия; после шага всё компилируется и тесты зелёные.
 
-- [ ] **1. Скелет.** `cmd/shortener/main.go`: `GET /healthz`, порт из `PORT`, `slog`, graceful shutdown
+- [x] **1. Скелет.** `cmd/shortener/main.go`: `GET /healthz`, порт из `PORT`, `slog`, graceful shutdown
   (`signal.NotifyContext` + `http.Server.Shutdown`).
   *Тест:* `httptest` — `/healthz` отвечает 200.
 - [ ] **2. Домен.** `link.New(url)` с валидацией (пусто, `ftp://`, относительный путь, нет хоста, ок);
