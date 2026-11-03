@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -25,12 +26,12 @@ func TestBaseURL(t *testing.T) {
 	}
 }
 
-func TestRunCancelled(t *testing.T) {
+func TestServeCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	result := make(chan error, 1)
 	go func() {
-		result <- run(ctx, "127.0.0.1:0", slog.New(slog.NewTextHandler(io.Discard, nil)))
+		result <- serve(ctx, "127.0.0.1:0", http.NotFoundHandler(), slog.New(slog.NewTextHandler(io.Discard, nil)))
 	}()
 	select {
 	case err := <-result:
@@ -42,7 +43,7 @@ func TestRunCancelled(t *testing.T) {
 	}
 }
 
-func TestRunPortInUse(t *testing.T) {
+func TestServePortInUse(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -50,8 +51,32 @@ func TestRunPortInUse(t *testing.T) {
 	defer listener.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err = run(ctx, listener.Addr().String(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	err = serve(ctx, listener.Addr().String(), http.NotFoundHandler(), slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err == nil || !strings.Contains(err.Error(), "listen HTTP:") {
 		t.Fatalf("error = %v, want listen failure", err)
+	}
+}
+
+func TestRunDatabaseFailure(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		url  string
+		want string
+	}{
+		{"missing", "", "DATABASE_URL is required"},
+		{"invalid", "postgres://user:secret@localhost:invalid/db", "configure database"},
+		{"unavailable", "postgres://user:secret@127.0.0.1:1/db?sslmode=disable", "connect database"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			err := run(ctx, "127.0.0.1:0", tt.url, slog.New(slog.NewTextHandler(io.Discard, nil)))
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want %q", err, tt.want)
+			}
+			if strings.Contains(err.Error(), "secret") {
+				t.Fatal("database error exposes password")
+			}
+		})
 	}
 }

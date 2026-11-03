@@ -29,7 +29,7 @@
   - [x] Workflow `CI` с job `Go checks`: Go из `go.mod`, PostgreSQL 17, vet и тесты с БД.
   - [x] Обязательная проверка `Go checks` от GitHub Actions в активном правиле `main`, без обходов;
     ветка PR должна быть актуальна относительно `main`.
-- [ ] **8. Сборка целиком.** Wiring в `main.go`, многостадийный `Dockerfile`, приложение в compose.
+- [x] **8. Сборка целиком.** Wiring в `main.go`, многостадийный `Dockerfile`, приложение в compose.
   *Проверка:* `docker compose up` + curl-примеры из README.
 - [ ] **9. Документация и полировка.** README с запуском полного приложения;
   чек-лист «проект готов» из ROADMAP.
