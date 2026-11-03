@@ -11,7 +11,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/uneronnik/shortener/internal/httpapi"
+	"github.com/uneronnik/shortener/internal/link"
+	"github.com/uneronnik/shortener/internal/postgres"
 )
 
 func main() {
@@ -22,16 +25,39 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	if err := run(ctx, ":"+port, logger); err != nil {
+	if err := run(ctx, ":"+port, os.Getenv("DATABASE_URL"), logger); err != nil {
 		logger.Error("server failed", "error", err)
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context, addr string, logger *slog.Logger) error {
+func run(ctx context.Context, addr, databaseURL string, logger *slog.Logger) error {
+	if databaseURL == "" {
+		return errors.New("DATABASE_URL is required")
+	}
+	config, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		// Parse errors may contain the connection string, including credentials.
+		return errors.New("configure database: invalid DATABASE_URL")
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return fmt.Errorf("create database pool: %w", err)
+	}
+	defer pool.Close()
+	connectCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err := pool.Ping(connectCtx); err != nil {
+		return fmt.Errorf("connect database: %w", err)
+	}
+	service := link.NewService(postgres.NewRepository(pool), link.GenerateCode)
+	return serve(ctx, addr, httpapi.NewHandler(service, baseURL()), logger)
+}
+
+func serve(ctx context.Context, addr string, handler http.Handler, logger *slog.Logger) error {
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           httpapi.NewHandler(nil, baseURL()),
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	serverErr := make(chan error, 1)
