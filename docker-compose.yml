@@ -6,6 +6,9 @@ services:
       DATABASE_URL: ${DOCKER_DATABASE_URL:?Set DOCKER_DATABASE_URL in .env}
       PORT: "8080"
       BASE_URL: ${BASE_URL:-http://localhost:8080}
+      HTTP_READ_TIMEOUT: ${HTTP_READ_TIMEOUT:-5s}
+      OPERATION_TIMEOUT: ${OPERATION_TIMEOUT:-3s}
+      HTTP_WRITE_TIMEOUT: ${HTTP_WRITE_TIMEOUT:-10s}
     ports:
       - "127.0.0.1:${PORT:-8080}:8080"
     depends_on:

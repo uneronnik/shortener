@@ -184,3 +184,135 @@ func TestSavePreservesDatabaseErrors(t *testing.T) {
 		t.Fatalf("negative clicks error = %v, want preserved check violation", err)
 	}
 }
+
+func singleConnectionRepository(t *testing.T, source *Repository, ctx context.Context) *Repository {
+	t.Helper()
+	config := source.pool.Config()
+	config.MaxConns = 1
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	return NewRepository(pool)
+}
+
+func TestPoolWaitDeadline(t *testing.T) {
+	original, setupCtx := newTestRepository(t)
+	repository := singleConnectionRepository(t, original, setupCtx)
+	held, err := repository.pool.Acquire(setupCtx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer held.Release()
+	for _, operation := range []struct {
+		name string
+		call func(context.Context) error
+	}{
+		{"save", func(ctx context.Context) error {
+			return repository.Save(ctx, link.Link{Code: "abcdefg", URL: "https://go.dev", CreatedAt: time.Now()})
+		}},
+		{"find", func(ctx context.Context) error { _, err := repository.FindByCode(ctx, "abcdefg"); return err }},
+		{"increment", func(ctx context.Context) error { _, err := repository.IncrementClicks(ctx, "abcdefg"); return err }},
+	} {
+		t.Run(operation.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(setupCtx, 20*time.Millisecond)
+			defer cancel()
+			if err := operation.call(ctx); !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("error = %v", err)
+			}
+		})
+	}
+	held.Release()
+	if err := repository.pool.Ping(setupCtx); err != nil {
+		t.Fatalf("pool unusable after timeouts: %v", err)
+	}
+}
+
+func TestBlockedUpdateCancellation(t *testing.T) {
+	for _, mode := range []string{"cancel", "deadline"} {
+		t.Run(mode, func(t *testing.T) {
+			original, setupCtx := newTestRepository(t)
+			repository := singleConnectionRepository(t, original, setupCtx)
+			value := link.Link{Code: "abcdefg", URL: "https://go.dev", CreatedAt: time.Now()}
+			if err := repository.Save(setupCtx, value); err != nil {
+				t.Fatal(err)
+			}
+			connection, err := repository.pool.Acquire(setupCtx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pid := connection.Conn().PgConn().PID()
+			connection.Release()
+			tx, err := original.pool.Begin(setupCtx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tx.Rollback(setupCtx)
+			if _, err := tx.Exec(setupCtx, "SELECT 1 FROM links WHERE code = $1 FOR UPDATE", value.Code); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(setupCtx, time.Second)
+			defer cancel()
+			result := make(chan error, 1)
+			go func() { _, err := repository.IncrementClicks(ctx, value.Code); result <- err }()
+			// Observe the actual database lock wait before exercising cancellation.
+			ticker := time.NewTicker(5 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				var waiting bool
+				if err := original.pool.QueryRow(setupCtx, "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE pid = $1 AND wait_event_type = 'Lock')", pid).Scan(&waiting); err != nil {
+					t.Fatal(err)
+				}
+				if waiting {
+					break
+				}
+				select {
+				case <-ctx.Done():
+					t.Fatal("SQL did not enter lock wait")
+				case <-ticker.C:
+				}
+			}
+			want := context.DeadlineExceeded
+			if mode == "cancel" {
+				cancel()
+				want = context.Canceled
+			}
+			select {
+			case err := <-result:
+				if !errors.Is(err, want) {
+					t.Fatalf("error = %v, want %v", err, want)
+				}
+			case <-setupCtx.Done():
+				t.Fatal("blocked SQL did not return")
+			}
+			// Driver cancellation may return before PostgreSQL receives the cancel packet.
+			// Keep the lock until the backend has stopped, so the update cannot race cleanup.
+			stopCtx, stopBackend := context.WithTimeout(setupCtx, 2*time.Second)
+			defer stopBackend()
+			for {
+				var active bool
+				if err := original.pool.QueryRow(stopCtx, "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE pid = $1 AND state = 'active')", pid).Scan(&active); err != nil {
+					t.Fatal(err)
+				}
+				if !active {
+					break
+				}
+				select {
+				case <-stopCtx.Done():
+					t.Fatal("database backend did not stop")
+				case <-ticker.C:
+				}
+			}
+			if err := tx.Rollback(setupCtx); err != nil {
+				t.Fatal(err)
+			}
+			checkCtx, stop := context.WithTimeout(setupCtx, 2*time.Second)
+			defer stop()
+			got, err := repository.FindByCode(checkCtx, value.Code)
+			if err != nil || got.Clicks != 0 {
+				t.Fatalf("after canceled SQL: %+v, %v", got, err)
+			}
+		})
+	}
+}

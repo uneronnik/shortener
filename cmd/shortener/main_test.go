@@ -1,7 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"fmt"
+	"github.com/uneronnik/shortener/internal/httpapi"
+	"github.com/uneronnik/shortener/internal/link"
 	"io"
 	"log/slog"
 	"net"
@@ -23,6 +27,40 @@ func TestBaseURL(t *testing.T) {
 				t.Fatalf("baseURL = %q, want %q", got, want)
 			}
 		})
+	}
+}
+
+func TestSlowRequestBody(t *testing.T) {
+	t.Setenv("HTTP_READ_TIMEOUT", "50ms")
+	t.Setenv("OPERATION_TIMEOUT", "50ms")
+	t.Setenv("HTTP_WRITE_TIMEOUT", "1s")
+	server, err := newHTTPServer("", httpapi.NewHandler(link.NewService(nil, nil), ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- server.Serve(listener) }()
+	t.Cleanup(func() { server.Close(); <-done })
+	conn, err := net.Dial("tcp", listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	conn.SetDeadline(time.Now().Add(2 * time.Second))
+	// Send valid headers but only part of the declared body, then wait for the server.
+	fmt.Fprint(conn, "POST /links HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100\r\n\r\n{")
+	response, err := http.ReadResponse(bufio.NewReader(conn), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil || response.StatusCode != http.StatusRequestTimeout || !strings.Contains(string(body), "request body timeout") {
+		t.Fatalf("response = %v %q, %v", response.StatusCode, body, err)
 	}
 }
 
