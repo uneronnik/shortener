@@ -14,9 +14,9 @@
 - [x] **4. HTTP-слой.** `POST /links`, `GET /{code}`, `GET /links/{code}`; JSON; ошибки → 400/404/500;
   `BASE_URL` из env.
   *Тест:* `httptest` на каждый эндпоинт и код ответа.
-- [ ] **5. PostgreSQL в Docker.** `docker-compose.yml` с `db`; миграция таблицы `links`
+- [x] **5. PostgreSQL в Docker.** `docker-compose.yml` с `db`; миграция таблицы `links`
   (`code` UNIQUE, `url`, `clicks`, `created_at`); `cmd/migrate`.
-  Решить: goose (библиотека в `cmd/migrate`) или образ `migrate/migrate` в compose.
+  Выбрана библиотека goose в `cmd/migrate`; SQL встроен через `embed.FS` ([ADR](adr/0001-database-migrations.md)).
   *Проверка:* `docker compose up -d db && go run ./cmd/migrate` создаёт таблицу.
 - [ ] **6. Репозиторий на pgx.** `Save` (unique_violation 23505 → `ErrCodeTaken`), `FindByCode`,
   атомарный `UPDATE ... SET clicks = clicks + 1 RETURNING url`.
