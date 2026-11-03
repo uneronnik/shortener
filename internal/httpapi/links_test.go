@@ -68,6 +68,35 @@ func TestCreateLinkInvalidJSON(t *testing.T) {
 	}
 }
 
+func TestCreateLinkBodyLimit(t *testing.T) {
+	for _, size := range []int{(1 << 20) - 1, 1 << 20, (1 << 20) + 1} {
+		t.Run(fmt.Sprint(size), func(t *testing.T) {
+			const prefix = `{"url":"https://go.dev/`
+			const suffix = `"}`
+			url := "https://go.dev/" + strings.Repeat("a", size-len(prefix)-len(suffix))
+			body := prefix + strings.TrimPrefix(url, "https://go.dev/") + suffix
+			calls := 0
+			service := stubService{shorten: func(_ context.Context, got string) (link.Link, error) {
+				calls++
+				if got != url {
+					t.Error("URL changed before reaching service")
+				}
+				return link.Link{Code: "abcdefg"}, nil
+			}}
+			w := httptest.NewRecorder()
+			NewHandler(service, "").ServeHTTP(w, httptest.NewRequest("POST", "/links", strings.NewReader(body)))
+			status, wantCalls := http.StatusCreated, 1
+			if size > 1<<20 {
+				status, wantCalls = http.StatusBadRequest, 0
+			}
+			assertJSONStatus(t, w, status)
+			if calls != wantCalls {
+				t.Fatalf("service calls = %d, want %d", calls, wantCalls)
+			}
+		})
+	}
+}
+
 func TestCreateLinkInvalidURL(t *testing.T) {
 	// Validation must fail before the service accesses its repository or generator.
 	h := NewHandler(link.NewService(nil, nil), "https://sho.rt")
