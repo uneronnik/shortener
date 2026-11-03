@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -15,6 +17,90 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/uneronnik/shortener/internal/link"
 )
+
+func TestConfiguredOperationDeadline(t *testing.T) {
+	for _, timeout := range []time.Duration{250 * time.Millisecond, 750 * time.Millisecond} {
+		for _, path := range []string{"/links", "/abcdefg", "/links/abcdefg"} {
+			t.Run(fmt.Sprintf("%s/%s", timeout, path), func(t *testing.T) {
+				var received context.Context
+				var calledAt time.Time
+				capture := func(ctx context.Context) {
+					received, calledAt = ctx, time.Now()
+				}
+				service := stubService{
+					shorten: func(ctx context.Context, _ string) (link.Link, error) {
+						capture(ctx)
+						return link.Link{Code: "abcdefg"}, nil
+					},
+					resolve: func(ctx context.Context, _ string) (string, error) { capture(ctx); return "https://go.dev", nil },
+					stats:   func(ctx context.Context, _ string) (link.Link, error) { capture(ctx); return link.Link{}, nil },
+				}
+				h := NewHandler(service, "", Options{OperationTimeout: timeout})
+				method := http.MethodGet
+				if path == "/links" {
+					method = http.MethodPost
+				}
+				before := time.Now()
+				h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(method, path, strings.NewReader(`{"url":"https://go.dev"}`)))
+				if received == nil {
+					t.Fatal("service not called")
+				}
+				deadline, ok := received.Deadline()
+				// Context creation occurs between handler entry and service invocation.
+				// Compare those bounds rather than sleeping or measuring timer delivery.
+				if !ok || deadline.Before(before.Add(timeout)) || deadline.After(calledAt.Add(timeout)) {
+					t.Fatalf("deadline = %v, want between %v and %v", deadline, before.Add(timeout), calledAt.Add(timeout))
+				}
+			})
+		}
+	}
+}
+
+func TestOperationContextReleased(t *testing.T) {
+	for _, failure := range []bool{false, true} {
+		for _, path := range []string{"/links", "/abcdefg", "/links/abcdefg"} {
+			t.Run(fmt.Sprintf("failure=%t/%s", failure, path), func(t *testing.T) {
+				parent, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				var received context.Context
+				capture := func(ctx context.Context) error {
+					received = ctx
+					if failure {
+						return errors.New("storage unavailable")
+					}
+					return nil
+				}
+				service := stubService{
+					shorten: func(ctx context.Context, _ string) (link.Link, error) {
+						return link.Link{Code: "abcdefg"}, capture(ctx)
+					},
+					resolve: func(ctx context.Context, _ string) (string, error) { return "https://go.dev", capture(ctx) },
+					stats:   func(ctx context.Context, _ string) (link.Link, error) { return link.Link{}, capture(ctx) },
+				}
+				h := NewHandler(service, "", Options{OperationTimeout: time.Hour, Logger: slog.New(slog.NewJSONHandler(io.Discard, nil))})
+				method := http.MethodGet
+				if path == "/links" {
+					method = http.MethodPost
+				}
+				h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(method, path, strings.NewReader(`{"url":"https://go.dev"}`)).WithContext(parent))
+				if received == nil {
+					t.Fatal("service not called")
+				}
+				select {
+				case <-received.Done():
+					if !errors.Is(received.Err(), context.Canceled) {
+						t.Fatalf("context error = %v, want canceled", received.Err())
+					}
+				default:
+					t.Fatal("operation context remains active after handler returned")
+				}
+				if parent.Err() != nil {
+					t.Fatalf("parent context was canceled: %v", parent.Err())
+				}
+			})
+		}
+	}
+}
 
 func TestOperationDeadline(t *testing.T) {
 	for _, path := range []string{"/links", "/abcdefg", "/links/abcdefg"} {
