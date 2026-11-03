@@ -21,11 +21,14 @@
 - [x] **6. Репозиторий на pgx.** `Save` (unique_violation 23505 → `ErrCodeTaken`), `FindByCode`,
   атомарный `UPDATE ... SET clicks = clicks + 1 RETURNING url`.
   *Тест:* интеграционные тесты при `TEST_DATABASE_URL`, иначе `t.Skip`.
-- [ ] **7. Минимальный CI.** GitHub Actions на pull request в `main` и push в `main`:
+- [x] **7. Минимальный CI.** GitHub Actions на pull request в `main` и push в `main`:
   версия Go из `go.mod`, сервис PostgreSQL 17, `go vet ./...` и `go test ./... -count=1`
   с заданным `TEST_DATABASE_URL`, чтобы интеграционные тесты не пропускались.
   *Проверка:* успешный запуск workflow в PR, включая тесты миграций и репозитория.
-  После первого успешного запуска сделать проверку обязательной для слияния через правила ветки `main`.
+  После первого успешного запуска проверка сделана обязательной для слияния через правила ветки `main`.
+  - [x] Workflow `CI` с job `Go checks`: Go из `go.mod`, PostgreSQL 17, vet и тесты с БД.
+  - [x] Обязательная проверка `Go checks` от GitHub Actions в активном правиле `main`, без обходов;
+    ветка PR должна быть актуальна относительно `main`.
 - [ ] **8. Сборка целиком.** Wiring в `main.go`, многостадийный `Dockerfile`, приложение в compose.
   *Проверка:* `docker compose up` + curl-примеры из README.
 - [ ] **9. Документация и полировка.** README с запуском полного приложения;
