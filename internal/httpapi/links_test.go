@@ -36,7 +36,7 @@ func TestCreateLink(t *testing.T) {
 	type contextKey struct{}
 	ctx := context.WithValue(context.Background(), contextKey{}, "request")
 	service := stubService{shorten: func(gotCtx context.Context, url string) (link.Link, error) {
-		if gotCtx != ctx || url != "https://go.dev" {
+		if gotCtx.Value(contextKey{}) != ctx.Value(contextKey{}) || url != "https://go.dev" {
 			t.Fatalf("Shorten arguments = %v, %q", gotCtx, url)
 		}
 		return link.Link{Code: "aB3xK9q"}, nil
@@ -86,7 +86,7 @@ func TestRedirectAndStats(t *testing.T) {
 	ctx := context.WithValue(context.Background(), contextKey{}, "request")
 	check := func(got context.Context, code string) {
 		t.Helper()
-		if got != ctx || code != "aB3xK9q" {
+		if got.Value(contextKey{}) != ctx.Value(contextKey{}) || code != "aB3xK9q" {
 			t.Fatalf("service arguments = %v, %q", got, code)
 		}
 	}

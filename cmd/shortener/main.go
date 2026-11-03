@@ -32,6 +32,10 @@ func main() {
 }
 
 func run(ctx context.Context, addr, databaseURL string, logger *slog.Logger) error {
+	cfg, err := loadTimeouts()
+	if err != nil {
+		return err
+	}
 	if databaseURL == "" {
 		return errors.New("DATABASE_URL is required")
 	}
@@ -42,23 +46,22 @@ func run(ctx context.Context, addr, databaseURL string, logger *slog.Logger) err
 	}
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
-		return fmt.Errorf("create database pool: %w", err)
+		return errors.New("create database pool: failed")
 	}
 	defer pool.Close()
 	connectCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	if err := pool.Ping(connectCtx); err != nil {
-		return fmt.Errorf("connect database: %w", err)
+		return errors.New("connect database: failed (check availability and credentials)")
 	}
 	service := link.NewService(postgres.NewRepository(pool), link.GenerateCode)
-	return serve(ctx, addr, httpapi.NewHandler(service, baseURL()), logger)
+	return serve(ctx, addr, httpapi.NewHandler(service, baseURL(), httpapi.Options{OperationTimeout: cfg.operation, Logger: logger}), logger)
 }
 
 func serve(ctx context.Context, addr string, handler http.Handler, logger *slog.Logger) error {
-	server := &http.Server{
-		Addr:              addr,
-		Handler:           handler,
-		ReadHeaderTimeout: 5 * time.Second,
+	server, err := newHTTPServer(addr, handler)
+	if err != nil {
+		return err
 	}
 	serverErr := make(chan error, 1)
 	go func() {
@@ -82,6 +85,21 @@ func serve(ctx context.Context, addr string, handler http.Handler, logger *slog.
 	}
 	logger.Info("HTTP server stopped")
 	return nil
+}
+
+func newHTTPServer(addr string, handler http.Handler) (*http.Server, error) {
+	cfg, err := loadTimeouts()
+	if err != nil {
+		return nil, err
+	}
+	return &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: min(5*time.Second, cfg.read),
+		ReadTimeout:       cfg.read,
+		WriteTimeout:      cfg.write,
+		IdleTimeout:       60 * time.Second,
+	}, nil
 }
 
 func baseURL() string {
