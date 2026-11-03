@@ -18,7 +18,7 @@
   (`code` UNIQUE, `url`, `clicks`, `created_at`); `cmd/migrate`.
   Выбрана библиотека goose в `cmd/migrate`; SQL встроен через `embed.FS` ([ADR](adr/0001-database-migrations.md)).
   *Проверка:* `docker compose up -d db && go run ./cmd/migrate` создаёт таблицу.
-- [ ] **6. Репозиторий на pgx.** `Save` (unique_violation 23505 → `ErrCodeTaken`), `FindByCode`,
+- [x] **6. Репозиторий на pgx.** `Save` (unique_violation 23505 → `ErrCodeTaken`), `FindByCode`,
   атомарный `UPDATE ... SET clicks = clicks + 1 RETURNING url`.
   *Тест:* интеграционные тесты при `TEST_DATABASE_URL`, иначе `t.Skip`.
 - [ ] **7. Сборка целиком.** Wiring в `main.go`, многостадийный `Dockerfile`, приложение в compose.
